@@ -521,12 +521,12 @@ procedure( parse_cad_sch(lib_name cell_name view_name file_name "tttt")
                     if( shape~>objType == "label"  then
                         if( shape~>layerName == "wire" || shape~>layerName == "pin" then
                             obj_type = 7   ; enum for wire label and pin label
-                        else if( shape~>layerName == "device" || shape~>layerName == "instance" then
-                            if( shape~>purpose == "annotate" then
+                        else if( shape~>layerName == "device" || shape~>layerName == "instance" || shape~>layerName == "text" then
+                            if( shape~>purpose == "annotate" || shape~>layerName == "text" then
                                 obj_type = 7   ; enum for device annotate
                             else
                                 obj_type = 8   ; enum for device label and instance label
-                            )
+                            )                    
                         else
                             error( "Unrecognized layerName = %s" shape~>layerName )
                         ))
@@ -535,12 +535,16 @@ procedure( parse_cad_sch(lib_name cell_name view_name file_name "tttt")
 
                         if( shape~>purpose == "label" then
                             purp_type = 237    ; get purpose number from cv?
+                            fprintf( p "%s  purpose: %d\n" indent purp_type )
                         else if( shape~>purpose == "annotate" then
-                            purp_type = 240    ; get purpose number from cv?
+                            purp_type = 240  
+                            fprintf( p "%s  purpose: %d\n" indent purp_type )
+                        else if( shape~>purpose == "drawing" then
+                            fprintf( p "%s  purpose: 4294967295\n" indent )  ; get purpose number from cv?
                         else
                             error( "Unrecognized purpose = %s" shape~>purpose )
-                        ))
-                        fprintf( p "%s  purpose: %d\n" indent purp_type )
+                            fprintf( p "%s  purpose: %d\n" indent purp_type )
+                        )))
 
                         indent = "      "
                         if( shape~>net~>name then
@@ -786,10 +790,11 @@ procedure( copy_templates_to_library(lib_name template_list "tl")
                 master_lib = car(template_info)
                 master_cell = cadr(template_info)
                 target_cell = caddr(template_info)
-
                 ; check if we copied this cell on this iteration yet
                 key = list(master_lib master_cell)
+                printf("Looking for %s %s ...................................\n" master_lib master_cell)
                 if( table[key] == 1 then
+                    ;printf("%s %s exists\n" master_lib master_cell)
                     ; wait for the next iteration
                     remaining = cons(template_info remaining)
                 else
@@ -813,6 +818,12 @@ procedure( copy_templates_to_library(lib_name template_list "tl")
                     gdmAddSpecToSpecList(gdmCreateSpec(lib_name target_cell nil nil "CDBA") targ_gdm)
                     table[key] = 1
                 )
+                if( dbOpenCellViewByType(lib_name target_cell "schematic" nil "r")==nil then
+                    printf("Looking for %s %s ...................................\n" master_lib master_cell)
+                    printf("%s %s CELL NOT MADE!!!!!!!!!!!!!!!!!\n" lib_name target_cell)
+                ;else
+                    ; printf("%s %s ok\n" lib_name target_cell)
+                )
             )
             ; Perform copy
             ccpCopy(src_gdm targ_gdm 't 'CCP_EXPAND_COMANAGED nil nil "" "" 'CCP_UPDATE_FROM_LIBLIST empty_spec)
@@ -823,6 +834,7 @@ procedure( copy_templates_to_library(lib_name template_list "tl")
 
             ; debug printing
             ; printstruct(table)
+
         )
     )
     't
@@ -1498,6 +1510,13 @@ procedure( create_concrete_schematic( lib_name tech_lib lib_path temp_file chang
             printf("*INFO* Copying templates to library: %s\n" lib_name)
             copy_templates_to_library( lib_name template_list )
         )
+        ; foreach( change change_list
+        ;     cell_name = change->name
+        ;     pin_map = change->pin_map
+        ;     new_pins = change->new_pins
+        ;     inst_list = change->inst_list
+        ;     printf("*DEBUG* Cell %s__%s\n" lib_name cell_name)
+        ; )
         foreach( change change_list
             cell_name = change->name
             pin_map = change->pin_map
